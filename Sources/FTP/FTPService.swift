@@ -13,21 +13,31 @@ public extension FTP {
     
     final class Service {
         
-        public var state: NWListener.State { listener.state }
+        public weak var delegate: FTPServiceDelegate?
+        
+        public var port: UInt16 { listener.port!.rawValue }
+        
+        public let path: String
+        
+        public private(set) var connects: [NWEndpoint: Connect] = [:]
+        
+        private var state: NWListener.State = .setup
         
         private let listener: NWListener
         private let queue = DispatchQueue(namespace: "Service")
-        private var connects: [NWEndpoint: Connect] = [:]
         
         deinit {
-            listener.cancel()
+            cancel()
         }
         
-        public init() throws {
-            listener = try NWListener(using: .tcp, on: 21)
+        public init(path: String = NSHomeDirectory(), port: UInt16 = 21) throws {
+            self.path = path
+            
+            listener = try NWListener(using: .tcp, on: NWEndpoint.Port(rawValue: port)!)
             listener.stateUpdateHandler = { [weak self] in
                 guard let self = self else { return }
-                self.stateChangeHandler($0)
+                self.state = $0
+                self.delegate?.service(self, change: $0)
             }
             listener.newConnectionHandler = { [weak self] in
                 guard let self = self else { return }
@@ -39,55 +49,45 @@ public extension FTP {
     
 }
 
-// MARK: - Method
+// MARK: - Public
 public extension FTP.Service {
     
     func start() {
         listener.start(queue: queue)
-        Log(listener)
+    }
+    
+    func cancel() {
+        if state == .cancelled { return }
+        listener.cancel()
     }
     
 }
 
-// MARK: - private
-private extension FTP.Service {
+// MARK: - Method
+extension FTP.Service {
+    
+    func removeConnect(_ connect: Connect){
+        connects[connect.endpoint] = nil
+    }
     
 }
 
 // MARK: - Handler
 private extension FTP.Service {
     
-    func stateChangeHandler(_ state: NWListener.State) {
-        Log(state)
-    }
-    
     func newConnectHandler(_ connect: NWConnection) {
-        let connect = Connect(connect: connect)
-        connect.delegate = self
+        let connect = Connect(service: self, connect: connect)
         connect.start()
         connects[connect.endpoint] = connect
     }
     
 }
 
-// MARK: - FTPServiceConnectDelegate
-extension FTP.Service: FTPServiceConnectDelegate {
+// MARK: - FTPServiceDelegate
+public protocol FTPServiceDelegate: AnyObject {
     
-    func connect(_ connect: Connect, change state: NWConnection.State) {
-        Log(state)
-        switch state {
-        case .failed(_):
-            connects[connect.endpoint] = nil
-            
-        case .cancelled:
-            connects[connect.endpoint] = nil
-            
-        default: break
-        }
-    }
+    func service(_ service: FTP.Service, change state: NWListener.State)
     
-    func connect(_ connect: Connect, sendFail error: NWError) {
-        Log(error)
-    }
+    func connect(_ connect: FTP.Service.Connect, login password: String) -> Bool
     
 }
