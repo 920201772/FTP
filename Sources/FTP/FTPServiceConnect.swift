@@ -18,7 +18,7 @@ extension FTP.Service {
         public private(set) var             username: String?
         
         private let connect: NWConnection
-        private let queue = DispatchQueue(namespace: "Service.Connect")
+        private let queue = DispatchQueue(label: "FTP.Service.Connect")
         private unowned let service: FTP.Service
         
         private var currentPath: String
@@ -62,7 +62,7 @@ extension FTP.Service.Connect {
     
     func send(_ response: FTP.Response) {
         // FIXME: Test
-        Log("send: \(response.text)")
+        print("send: \(response.text)")
         
         connect.send(content: response.text.data(using: .utf8), completion: .contentProcessed({ _ in }))
     }
@@ -77,7 +77,7 @@ private extension FTP.Service.Connect {
             guard let self = self else { return }
             
             // FIXME: Test
-            Log("receive: \(String(data: data ?? Data(), encoding: .utf8) ?? "")")
+            print("receive: \(String(data: data ?? Data(), encoding: .utf8) ?? "")")
             
             if let data = data {
                 if let command = FTP.Command(String(data: data, encoding: .utf8)) {

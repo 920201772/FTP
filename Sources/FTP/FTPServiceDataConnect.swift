@@ -14,7 +14,7 @@ extension FTP.Service {
     final class DataConnect: NSObject {
         
         private let listener: NWListener
-        private let queue = DispatchQueue(namespace: "Service.DataConnect")
+        private let queue = DispatchQueue(label: "FTP.Service.DataConnect")
         private unowned let connect: FTP.Service.Connect
         
         private var dataConnect: NWConnection?
@@ -68,7 +68,6 @@ extension FTP.Service.DataConnect {
                     guard let attr = try? url.resourceValues(forKeys: attrKeys),
                           let fileSecurity = attr.fileSecurity,
                           let linkCount = attr.linkCount,
-                          let size = attr.fileSize ?? 0,
                           let modifyDate = attr.contentModificationDate,
                           let name = attr.name else {
                         return result
@@ -106,6 +105,7 @@ extension FTP.Service.DataConnect {
                         group = "\(gid)"
                     }
                     
+                    let size = attr.fileSize ?? 0
                     total += 1
                     
                     return result + "\(authority) \(linkCount) \(owner) \(group) \(size) \(dateFormat.string(from: modifyDate)) \(name)\n"
