@@ -156,9 +156,9 @@ extension FTP {
         case NOOP
         /// 系统登录密码
         case PASS(_ password: String)
-        /// 请求服务器等待数据连接
+        /// 被动模式, 请求服务器等待数据连接
         case PASV
-        /// IP 地址和两字节的端口 ID
+        /// 主动模式, IP地址和两字节的端口ID
         case PORT(_ address: String)
         /// 显示当前工作目录
         case PWD

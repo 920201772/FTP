@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import Network
 
 public extension FTP {
     

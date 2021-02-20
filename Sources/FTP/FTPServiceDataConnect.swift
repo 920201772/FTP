@@ -1,6 +1,6 @@
 //
 //  FTPServiceDataConnect.swift
-//  Kun
+//  
 //
 //  Created by 杨柳 on 2021/2/1.
 //  Copyright © 2021 Kun. All rights reserved.

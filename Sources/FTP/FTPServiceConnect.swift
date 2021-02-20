@@ -15,7 +15,7 @@ extension FTP.Service {
         
         public var state: NWConnection.State { connect.state }
         public var endpoint: NWEndpoint { connect.endpoint }
-        public private(set) var             username: String?
+        public private(set) var username: String?
         
         private let connect: NWConnection
         private let queue = DispatchQueue(namespace: "Service.Connect")

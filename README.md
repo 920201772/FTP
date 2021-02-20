@@ -1,8 +1,95 @@
 # FTP
-
 A description of this package.
 
-# FTP 协议
+# 实现
+FTP运行于TCP协议之上, 所以使用iOS 12.0支持的Network库来实现.
+
+![客户端连接过程](Resources/客户端连接过程.png)
+[客户端连接过程示例](#客户端连接过程示例)
+
+主动和被动模式:
+FTP有两种使用模式：主动和被动。
+主动模式要求客户端和服务器端同时打开并且监听一个端口以创建连接。在这种情况下，客户端由于安装了防火墙会产生一些问题。
+所以，创立了被动模式。被动模式只要求服务器端产生一个监听相应端口的进程，这样就可以绕过客户端安装了防火墙的问题。
+
+![被动模式](Resources/被动模式.png)
+[被动模式示例](#被动模式示例)
+
+## 服务端
+### 客户端连接过程示例
+使用TCP监听一个控制端口(FTP协议控制端口默认为21)
+```swift
+let listener = try NWListener(using: .tcp, on: 21)
+listener.newConnectionHandler = { 
+    // 与客户端建立连接
+    connect.stateUpdateHandler = {
+        // 监听与客户端连接状态改变
+        stateChangeHandler($0)
+    }
+    connect.start(queue: queue)
+}
+listener.start(queue: queue)
+```
+
+等待与客户端连接成功
+```swift
+func stateChangeHandler(_ state: NWConnection.State) {
+    switch state {
+        case .ready:
+            // 发送 220 服务就绪, 每条命令或响应的结尾是\r\n
+            connect.send(content: "220 \r\n".data(using: .utf8), completion: .contentProcessed({ _ in }))
+            // 接收数据
+            receive()
+
+        default: break
+    }
+}
+```
+
+接收数据客户端命令
+```swift
+func receive() {
+    connect.receive(minimumIncompleteLength: 1, maximumLength: Int(UInt16.max)) { data, ctx, isFinal, error in
+        if let data = data {
+            if let text = String(data: data, encoding: .utf8) {
+                let params = text.trimmingCharacters(in: .newlines).split(separator: " ", maxSplits: 1)
+                switch params.first {
+                case "USER":
+                    // 需要密码
+                    send("331 \r\n")
+
+                case "PASS":
+                    // 登录成功
+                    send("230 \r\n")
+                
+                case "PWD":
+                    // 当前路径
+                    send("257 \"currentPath\"\r\n")
+                     
+                default: 
+                    // 无效命令
+                    send("500 \r\n")
+                }
+            } else {
+                send("500 \r\n")
+            }
+        }
+
+        if isFinal {
+            connect.cancel()
+        } else {
+            receive()
+        }
+    }
+}
+```
+
+### 被动模式示例
+
+
+# FTP 协议参考
+[文档](Resources/RFC959%20FTP%20传输协议.pdf)
+
 ## FTP 响应码
 | 响应代码 | 状态 |
 | --- | --- |
@@ -80,8 +167,8 @@ A description of this package.
 |NLST *`directory`* | 列出指定目录内容 |
 |NOOP | 无动作, 除了来自服务器上的承认 |
 |PASS *`password`* | 系统登录密码 |
-|PASV | 请求服务器等待数据连接 |
-|PORT *`address`* | IP 地址和两字节的端口 ID |
+|PASV | 被动模式, 请求服务器等待数据连接 |
+|PORT *`address`* | 主动模式, IP地址和两字节的端口ID |
 |PWD | 显示当前工作目录 |
 |QUIT | 从 FTP 服务器上退出登录 |
 |REIN | 重新初始化登录状态连接 |
