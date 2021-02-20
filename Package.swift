@@ -6,7 +6,8 @@ import PackageDescription
 let package = Package(
     name: "FTP",
     platforms: [
-        .iOS(.v12)
+        .iOS(.v12),
+        .macOS(.v10_14)
     ],
     products: [
         .library(

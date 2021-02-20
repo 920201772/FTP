@@ -383,6 +383,24 @@ extension FTP {
     
 }
 
+// MARK: - Extension
+private extension Collection {
+    
+    /// 安全索引
+    subscript(safe index: Index?) -> Element? {
+        guard let index = index else { return nil }
+        return index.contains(startIndex..<endIndex) ? self[index] : nil
+    }
+    
+    
+    
+}
 
-
-
+private extension Comparable {
+    
+    /// 是否在范围内(闭区间,[0..<2])
+    func contains(_ range: Range<Self>) -> Bool {
+        return range.contains(self)
+    }
+    
+}

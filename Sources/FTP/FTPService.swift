@@ -24,7 +24,7 @@ public extension FTP {
         private var state: NWListener.State = .setup
         
         private let listener: NWListener
-        private let queue = DispatchQueue(namespace: "Service")
+        private let queue = DispatchQueue(label: "FTP.Service")
         
         deinit {
             cancel()
