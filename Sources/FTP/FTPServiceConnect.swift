@@ -151,10 +151,10 @@ private extension FTP.Service.Connect {
             break
             
         case .PASS(let password):
-            if service.delegate?.connect(self, login: password) == true {
-                send(.loginSuccess)
-            } else {
+            if service.delegate?.connect(self, login: password) == false {
                 send(.loginFail)
+            } else {
+                send(.loginSuccess)
             }
             
         case .PASV:

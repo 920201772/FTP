@@ -1,11 +1,26 @@
 # FTP
 A description of this package.
 
+## Requirements
+- iOS 12.0+ / macOS 10.14+
+- Xcode 12.0+
+- Swift 5.3+
+
+## Installation
+Swift Packages https://github.com/920201772/FTP.git
+
+## Usage
+### Server
+```swift
+let service = try? FTP.Service()
+service?.start()
+```
+
 # 实现
 FTP运行于TCP协议之上, 所以使用iOS 12.0支持的Network库来实现.
 
-![客户端连接过程](Resources/客户端连接过程.png)
-[客户端连接过程示例](#客户端连接过程示例)
+![连接过程](Resources/连接过程.png)
+[服务端连接过程示例](#连接过程示例)
 
 主动和被动模式:
 FTP有两种使用模式：主动和被动。
@@ -13,10 +28,13 @@ FTP有两种使用模式：主动和被动。
 所以，创立了被动模式。被动模式只要求服务器端产生一个监听相应端口的进程，这样就可以绕过客户端安装了防火墙的问题。
 
 ![被动模式](Resources/被动模式.png)
-[被动模式示例](#被动模式示例)
+[服务端被动模式示例](#被动模式示例)
+
+![文件下载](Resources/文件下载.png)
+[服务端文件下载示例](#文件下载示例)
 
 ## 服务端
-### 客户端连接过程示例
+### 连接过程示例
 使用TCP监听一个控制端口(FTP协议控制端口默认为21)
 ```swift
 let listener = try NWListener(using: .tcp, on: 21)
@@ -56,22 +74,22 @@ func receive() {
                 switch params.first {
                 case "USER":
                     // 需要密码
-                    send("331 \r\n")
+                    connect.send("331 \r\n")
 
                 case "PASS":
                     // 登录成功
-                    send("230 \r\n")
+                    connect.send("230 \r\n")
                 
                 case "PWD":
                     // 当前路径
-                    send("257 \"currentPath\"\r\n")
+                    connect.send("257 \"currentPath\"\r\n")
                      
                 default: 
                     // 无效命令
-                    send("500 \r\n")
+                    connect.send("500 \r\n")
                 }
             } else {
-                send("500 \r\n")
+                connect.send("500 \r\n")
             }
         }
 
@@ -85,10 +103,84 @@ func receive() {
 ```
 
 ### 被动模式示例
+收到`PASV`(被动模式)命令, 监听数据端口
+```swift
+// 0为系统选择端口
+let dataListener = try NWListener(using: .tcp, on: 0)
+dataListener.stateUpdateHandler = {
+    switch $0 {
+        case .failed(_):
+            // 连接关闭
+            connect.send("426 \r\n")
+        
+        case .ready:
+            guard let ip = en0IPv4Address?.replacingOccurrences(of: ".", with: ","),
+                  let port = dataListener.port?.rawValue else {
+                connect.send("426 \r\n")
+                return
+            }
+            
+            // 进入被动模式
+            connect.send("227 (\(ip),\(port >> 8),\(port & 0xFF))\r\n")
+            
+    default:
+        break
+    }
+}
+dataListener.newConnectionHandler = { dataConnect in
+    dataConnect.start(queue: queue)
+}
 
+dataListener.start(queue: queue)
+```
+
+### 文件下载示例
+以下步骤前置条件需要被动模式开启
+收到`RETR filename`(从服务器上复文件)命令
+```swift
+// 使用文件流可以避免文件过大问题
+let path = "\(currentPath)/\(filename)"
+guard let stream = InputStream(fileAtPath: path) else {
+    // 文件不可用
+    connect.send("550 \r\n")
+    return
+}
+stream.delegate = self
+stream.schedule(in: .main, forMode: .common)
+stream.open()
+
+// 数据连接已打开, 传输开始
+connect.send("125 \r\n")
+
+// StreamDelegate
+func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+    switch eventCode {
+        case .hasBytesAvailable:
+            let stream = aStream as! InputStream
+            let mpData = UnsafeMutablePointer<UInt8>.allocate(capacity: Int(UInt16.max))
+            let length = stream.read(mpData, maxLength: Int(UInt16.max))
+            if length != 0 {
+                // 传输数据
+                dataConnect.send(Data(bytes: mpData, count: length))
+            }
+            mpData.deallocate()
+                
+        case .errorOccurred, .endEncountered:
+            aStream.close()
+            aStream.remove(from: .main, forMode: .common)
+            dataConnect.cancel()
+
+            // 传输完成, 结束数据连接
+            connect.send("226 \r\n")
+
+        default:
+            break
+    }
+}
+```
 
 # FTP 协议参考
-[文档](Resources/RFC959%20FTP%20传输协议.pdf)
+[RFC959 FTP 中文文档](Resources/RFC959%20FTP%20传输协议.pdf)
 
 ## FTP 响应码
 | 响应代码 | 状态 |
